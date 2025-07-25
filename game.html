@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Conservation Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Tone.js for sound effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* General body styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom right, #e0f7fa, #bbdefb); /* Light blue gradient */
+            color: #263238; /* Dark text for contrast */
+            /* Removed overflow: hidden; to allow scrolling if content exceeds viewport */
+        }
+
+        /* Game container styling */
+        .game-container {
+            background-color: #ffffff;
+            border-radius: 20px; /* Rounded corners */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); /* Soft shadow */
+            padding: 30px;
+            text-align: center;
+            max-width: 90%; /* Responsive width */
+            width: 600px; /* Max width for larger screens */
+            box-sizing: border-box; /* Include padding in width */
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Title styling */
+        h1 {
+            color: #00796b; /* Teal color for emphasis */
+            margin-bottom: 15px;
+            font-size: 2.2em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* Game area styling */
+        .game-area {
+            width: 100%;
+            height: 350px; /* Fixed height for game area */
+            border: 2px dashed #81d4fa; /* Dashed light blue border */
+            border-radius: 15px;
+            background-color: #e3f2fd; /* Very light blue background */
+            position: relative;
+            overflow: hidden; /* Keep overflow hidden for the game area itself */
+            margin-bottom: 20px;
+        }
+
+        /* Score and timer display */
+        .score-board {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #004d40; /* Darker teal */
+        }
+
+        /* Faucet styling */
+        .faucet {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background-color: #90a4ae; /* Grey for faucet */
+            border-radius: 50%; /* Circular faucet base */
+            cursor: pointer;
+            transition: transform 0.1s ease-out, opacity 0.3s ease-in-out;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3em; /* Emoji size */
+            line-height: 1;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 3px solid #607d8b; /* Darker grey border */
+        }
+
+        .faucet.fixed {
+            opacity: 0; /* Hide fixed faucets */
+            pointer-events: none; /* Disable clicks on fixed faucets */
+        }
+
+        /* Water drop animation - REVERTED TO ORIGINAL APPEARANCE */
+        .water-drop {
+            position: absolute;
+            width: 15px; /* Original size */
+            height: 15px; /* Original size */
+            background-color: #2196f3; /* Original color */
+            border-radius: 50%;
+            opacity: 0.8; /* Original opacity */
+            animation: drip 1s linear infinite; /* Original speed */
+            pointer-events: none; /* Don't block clicks on faucet */
+            transform: translateY(0);
+        }
+
+        @keyframes drip {
+            0% { transform: translateY(0) scale(1); opacity: 0.8; }
+            100% { transform: translateY(50px) scale(0.5); opacity: 0; } /* Original fall distance */
+        }
+
+        /* Start button styling */
+        .start-button, .restart-button, #pauseButton { /* Added #pauseButton */
+            background: linear-gradient(to right, #4caf50, #81c784); /* Green gradient */
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 30px;
+            font-size: 1.3em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .start-button:hover, .restart-button:hover, #pauseButton:hover {
+            background: linear-gradient(to right, #66bb6a, #a5d6a7);
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .start-button:active, .restart-button:active, #pauseButton:active {
+            transform: translateY(0);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Game message (intro/game over) styling */
+        .game-message { /* Renamed from .game-over-message */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #00796b;
+            z-index: 10;
+            /* Initially visible, will be hidden by JS on game start */
+        }
+
+        .game-message p {
+            margin: 0;
+            padding: 0 20px;
+            line-height: 1.4;
+        }
+
+        .game-message .final-score {
+            font-size: 2em;
+            color: #004d40;
+        }
+
+        /* Pause overlay styling */
+        .pause-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+            border-radius: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 3em;
+            font-weight: bold;
+            z-index: 11; /* Above game message */
+            pointer-events: none; /* Allow clicks to pass through to game area if needed, but not for this text */
+            display: none; /* Hidden by default */
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .game-container {
+                padding: 20px;
+                width: 95%;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+            .score-board {
+                font-size: 1em;
+            }
+            .faucet {
+                width: 50px;
+                height: 50px;
+                font-size: 2.5em;
+            }
+            .game-area {
+                height: 300px;
+            }
+            .start-button, .restart-button, #pauseButton {
+                font-size: 1.1em;
+                padding: 10px 20px;
+            }
+            .game-message { /* Renamed */
+                font-size: 1.2em;
+            }
+            .game-message .final-score {
+                font-size: 1.8em;
+            }
+            .pause-overlay {
+                font-size: 2.5em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .game-container {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 1.5em;
+            }
+            .score-board {
+                flex-direction: column;
+                gap: 5px;
+            }
+            .faucet {
+                width: 45px;
+                height: 45px;
+                font-size: 2.2em;
+            }
+            .game-area {
+                height: 250px;
+            }
+            .start-button, .restart-button, #pauseButton {
+                font-size: 1em;
+                padding: 8px 15px;
+            }
+            .game-message { /* Renamed */
+                font-size: 1em;
+            }
+            .game-message .final-score {
+                font-size: 1.5em;
+            }
+            .pause-overlay {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>💧 Water Conservation Challenge! 💧</h1>
+        <div class="score-board">
+            <div>Water Saved: <span id="waterSaved">0</span> L</div>
+            <div>Faucets Fixed: <span id="faucetsFixed">0</span></div>
+            <div>Time Left: <span id="timeLeft">60</span> s</div>
+        </div>
+        <div class="game-area" id="gameArea">
+            <!-- Game message will be displayed here -->
+            <div class="game-message" id="gameMessage">
+                <p id="gameMessageTitle">Welcome to the Water Conservation Challenge!</p>
+                <p id="gameMessageTip">Click "Start Game" to begin!</p>
+                <p>You fixed <span class="final-faucets-fixed">0</span> Faucets!</p>
+                <p>You saved <span class="final-water-saved">0</span> Liters of Water!</p>
+                <button class="restart-button" id="gameMessageButton">Start Game</button>
+            </div>
+            <div class="pause-overlay" id="pauseOverlay">PAUSED</div>
+        </div>
+        <button class="start-button" id="startButton">Start Game</button>
+        <button id="pauseButton" style="display: none;">Pause</button> <!-- New pause button -->
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const gameArea = document.getElementById('gameArea');
+        const waterSavedSpan = document.getElementById('waterSaved');
+        const faucetsFixedSpan = document.getElementById('faucetsFixed');
+        const timeLeftSpan = document.getElementById('timeLeft');
+        const startButton = document.getElementById('startButton');
+        const pauseButton = document.getElementById('pauseButton'); // New pause button reference
+        const pauseOverlay = document.getElementById('pauseOverlay'); // New pause overlay reference
+
+        // Renamed game over message to game message for reusability
+        const gameMessage = document.getElementById('gameMessage');
+        const gameMessageTitle = document.getElementById('gameMessageTitle');
+        const gameMessageTip = document.getElementById('gameMessageTip');
+        const gameMessageButton = document.getElementById('gameMessageButton');
+        const finalFaucetsFixedSpan = gameMessage.querySelector('.final-faucets-fixed');
+        const finalWaterSavedSpan = gameMessage.querySelector('.final-water-saved');
+
+        // Game variables
+        let waterSaved = 0;
+        let faucetsFixed = 0;
+        let timeLeft = 60; // seconds
+        let gameInterval;
+        let faucetInterval;
+        let dripSoundLoops = {};
+        let faucetTimeouts = {};
+        let isPaused = false; // New state variable for pause
+
+        // To store remaining time for timeouts when paused
+        let pausedFaucetTimeouts = {};
+
+        // Difficulty settings
+        const initialFaucetGenerationRate = 1000; // milliseconds
+        const minFaucetGenerationRate = 200; // fastest rate
+        const rateDecreasePerLevel = 100; // how much faster per level
+        const scorePerLevel = 100; // score needed to increase difficulty (based on water saved)
+        let currentFaucetGenerationRate = initialFaucetGenerationRate;
+        let currentDifficultyLevel = 0;
+
+        const faucetVanishTime = 3000; // Faucet vanishes after 3 seconds if not clicked
+        const waterLossOnVanish = 20; // Water lost if a faucet vanishes
+        const waterLossOnMissClick = 5; // Water lost if clicking on the background
+
+        const maxFaucets = 5; // Maximum number of active faucets
+        let activeFaucets = [];
+        let gameRunning = false;
+
+        // Initialize Tone.js synths for sound effects
+        const dripSynth = new Tone.Synth({
+            oscillator: { type: "triangle" },
+            envelope: {
+                attack: 0.01,
+                decay: 0.1,
+                sustain: 0.0,
+                release: 0.1
+            }
+        }).toDestination();
+
+        const fixSound = new Tone.Synth({
+            oscillator: { type: "sine" },
+            envelope: {
+                attack: 0.02,
+                decay: 0.15,
+                sustain: 0.0,
+                release: 0.2
+            }
+        }).toDestination();
+
+        const missClickSound = new Tone.Synth({
+            oscillator: { type: "square" },
+            envelope: {
+                attack: 0.01,
+                decay: 0.1,
+                sustain: 0.0,
+                release: 0.1
+            }
+        }).toDestination();
+
+        // Array of water conservation tips
+        const waterTips = [
+            "A leaky faucet can waste up to 7,500 liters of water per year!",
+            "Shorten your showers by a minute or two to save up to 550 liters a month.",
+            "Turn off the tap while brushing your teeth or shaving. This can save 10-20 liters per minute!",
+            "Only run your washing machine and dishwasher when they are full.",
+            "Collect rainwater for watering plants or your garden.",
+            "Check your toilet for leaks by adding food coloring to the tank. If color appears in the bowl, you have a leak!",
+            "Water your plants in the early morning or late evening to reduce evaporation.",
+            "Use a broom instead of a hose to clean driveways and sidewalks.",
+            "Install water-saving showerheads and low-flow toilets.",
+            "Defrost food in the refrigerator overnight instead of using hot water."
+        ];
+
+        // Function to update the score display and check difficulty
+        function updateScore() {
+            waterSavedSpan.textContent = waterSaved;
+            faucetsFixedSpan.textContent = faucetsFixed;
+
+            const newDifficultyLevel = Math.floor(waterSaved / scorePerLevel);
+            if (newDifficultyLevel > currentDifficultyLevel) {
+                currentDifficultyLevel = newDifficultyLevel;
+                const newRate = initialFaucetGenerationRate - (currentDifficultyLevel * rateDecreasePerLevel);
+                currentFaucetGenerationRate = Math.max(minFaucetGenerationRate, newRate);
+
+                if (!isPaused) { // Only restart interval if not paused
+                    clearInterval(faucetInterval);
+                    faucetInterval = setInterval(generateFaucet, currentFaucetGenerationRate);
+                }
+                console.log(`Difficulty increased! New faucet rate: ${currentFaucetGenerationRate}ms`);
+            }
+        }
+
+        // Function to update the timer display
+        function updateTimer() {
+            timeLeftSpan.textContent = timeLeft;
+        }
+
+        // Function to create a water drop animation
+        function createWaterDrop(faucetElement) {
+            const drop = document.createElement('div');
+            drop.classList.add('water-drop');
+            drop.style.left = `${faucetElement.offsetLeft + faucetElement.offsetWidth / 2 - (drop.offsetWidth / 2)}px`;
+            drop.style.top = `${faucetElement.offsetTop + faucetElement.offsetHeight}px`;
+            gameArea.appendChild(drop);
+
+            drop.addEventListener('animationend', () => {
+                drop.remove();
+            });
+        }
+
+        // Function to handle a faucet vanishing (either fixed or timed out)
+        function vanishFaucet(faucet, lostDueToTimeout = false) {
+            if (dripSoundLoops[faucet.dataset.faucetId]) {
+                dripSoundLoops[faucet.dataset.faucetId].stop();
+                dripSoundLoops[faucet.dataset.faucetId].dispose();
+                delete dripSoundLoops[faucet.dataset.faucetId];
+            }
+
+            // Clear its vanish timeout and remove from paused list if it was there
+            if (faucetTimeouts[faucet.dataset.faucetId]) {
+                clearTimeout(faucetTimeouts[faucet.dataset.faucetId]);
+                delete faucetTimeouts[faucet.dataset.faucetId];
+            }
+            if (pausedFaucetTimeouts[faucet.dataset.faucetId]) {
+                delete pausedFaucetTimeouts[faucet.dataset.faucetId];
+            }
+
+            activeFaucets = activeFaucets.filter(f => f !== faucet);
+            faucet.classList.add('fixed');
+
+            if (lostDueToTimeout) {
+                waterSaved -= waterLossOnVanish;
+                if (waterSaved < 0) waterSaved = 0;
+                updateScore();
+                faucet.innerHTML = '❌';
+                fixSound.triggerAttackRelease("C2", "8n", Tone.now());
+            } else {
+                faucet.innerHTML = '✅';
+                fixSound.triggerAttackRelease("G4", "16n", Tone.now());
+            }
+
+            setTimeout(() => {
+                faucet.remove();
+            }, 300);
+        }
+
+        // Function to generate a new leaky faucet
+        function generateFaucet() {
+            if (!gameRunning || activeFaucets.length >= maxFaucets || isPaused) { // Added isPaused check
+                return;
+            }
+
+            const faucet = document.createElement('div');
+            faucet.classList.add('faucet');
+            faucet.innerHTML = '💧';
+            faucet.dataset.faucetId = Date.now();
+
+            const gameAreaWidth = gameArea.clientWidth - 60;
+            const gameAreaHeight = gameArea.clientHeight - 60;
+
+            faucet.style.left = `${Math.random() * gameAreaWidth}px`;
+            faucet.style.top = `${Math.random() * gameAreaHeight}px`;
+
+            // Store the start time of the timeout
+            faucet.dataset.timeoutStartTime = Date.now();
+            faucetTimeouts[faucet.dataset.faucetId] = setTimeout(() => {
+                if (faucet.parentNode && !faucet.classList.contains('fixed')) {
+                    console.log(`Faucet ${faucet.dataset.faucetId} vanished due to timeout.`);
+                    vanishFaucet(faucet, true);
+                }
+            }, faucetVanishTime);
+
+            faucet.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (gameRunning && !faucet.classList.contains('fixed') && !isPaused) { // Added isPaused check
+                    waterSaved += 10;
+                    faucetsFixed += 1;
+                    updateScore();
+                    vanishFaucet(faucet, false);
+                }
+            });
+
+            gameArea.appendChild(faucet);
+            activeFaucets.push(faucet);
+
+            const dripLoop = new Tone.Loop(time => {
+                if (faucet.parentNode && !faucet.classList.contains('fixed') && !isPaused) { // Only create drops if not fixed/vanished
+                    createWaterDrop(faucet);
+                    // Add a small offset to the time to ensure it's strictly greater
+                    dripSynth.triggerAttackRelease("C3", "8n", time + 0.001);
+                    waterSaved -= 1;
+                    if (waterSaved < 0) waterSaved = 0;
+                    updateScore();
+                } else if (isPaused) {
+                    // Do nothing, just let the loop continue without action if paused
+                } else {
+                    dripLoop.stop();
+                    dripLoop.dispose();
+                    delete dripSoundLoops[faucet.dataset.faucetId];
+                }
+            }, "0.3s").start(0);
+
+            dripSoundLoops[faucet.dataset.faucetId] = dripLoop;
+        }
+
+        // Function to toggle pause state
+        function togglePause() {
+            isPaused = !isPaused;
+            if (isPaused) {
+                // Pause game
+                clearInterval(gameInterval);
+                clearInterval(faucetInterval);
+                Tone.Transport.pause(); // Pause Tone.js transport for all loops
+
+                // Pause individual faucet timeouts
+                activeFaucets.forEach(faucet => {
+                    const faucetId = faucet.dataset.faucetId;
+                    if (faucetTimeouts[faucetId]) {
+                        clearTimeout(faucetTimeouts[faucetId]);
+                        const elapsed = Date.now() - parseInt(faucet.dataset.timeoutStartTime);
+                        pausedFaucetTimeouts[faucetId] = faucetVanishTime - elapsed; // Store remaining time
+                        console.log(`Paused faucet ${faucetId} with ${pausedFaucetTimeouts[faucetId]}ms remaining.`);
+                    }
+                });
+
+                pauseButton.textContent = 'Resume';
+                pauseOverlay.style.display = 'flex'; // Show pause overlay
+                gameArea.style.pointerEvents = 'none'; // Disable clicks on game area
+            } else {
+                // Resume game
+                gameInterval = setInterval(() => {
+                    timeLeft--;
+                    updateTimer();
+                    if (timeLeft <= 0) {
+                        endGame();
+                    }
+                }, 1000);
+                faucetInterval = setInterval(generateFaucet, currentFaucetGenerationRate);
+                Tone.Transport.start(); // Resume Tone.js transport
+
+                // Resume individual faucet timeouts
+                activeFaucets.forEach(faucet => {
+                    const faucetId = faucet.dataset.faucetId;
+                    if (pausedFaucetTimeouts[faucetId] !== undefined) {
+                        faucet.dataset.timeoutStartTime = Date.now(); // Reset start time for accurate resume
+                        faucetTimeouts[faucetId] = setTimeout(() => {
+                            if (faucet.parentNode && !faucet.classList.contains('fixed')) {
+                                console.log(`Faucet ${faucetId} vanished after resume timeout.`);
+                                vanishFaucet(faucet, true);
+                            }
+                        }, pausedFaucetTimeouts[faucetId]);
+                        delete pausedFaucetTimeouts[faucetId]; // Clear from paused list
+                    }
+                });
+
+                pauseButton.textContent = 'Pause';
+                pauseOverlay.style.display = 'none'; // Hide pause overlay
+                gameArea.style.pointerEvents = 'auto'; // Enable clicks on game area
+            }
+        }
+
+        // Function to end the game
+        function endGame() {
+            gameRunning = false;
+            clearInterval(gameInterval);
+            clearInterval(faucetInterval);
+            Tone.Transport.stop(); // Stop Tone.js transport
+
+            for (const id in dripSoundLoops) {
+                dripSoundLoops[id].stop();
+                dripSoundLoops[id].dispose();
+            }
+            dripSoundLoops = {};
+
+            for (const id in faucetTimeouts) {
+                clearTimeout(faucetTimeouts[id]);
+            }
+            faucetTimeouts = {};
+            pausedFaucetTimeouts = {}; // Clear any paused timeouts as well
+
+            activeFaucets.forEach(faucet => faucet.remove());
+            activeFaucets = [];
+            document.querySelectorAll('.water-drop').forEach(drop => drop.remove());
+
+            // Show game over message
+            gameMessageTitle.textContent = "Time's Up! Great Job!";
+            gameMessageTip.style.display = 'none'; // Hide the initial tip
+            finalFaucetsFixedSpan.textContent = faucetsFixed;
+            finalWaterSavedSpan.textContent = waterSaved;
+            gameMessage.querySelector('p:nth-of-type(4)').textContent = waterTips[Math.floor(Math.random() * waterTips.length)]; // Random tip at end
+            gameMessage.style.display = 'flex';
+            gameMessageButton.textContent = 'Play Again';
+            startButton.style.display = 'none';
+            pauseButton.style.display = 'none'; // Hide pause button on game over
+            pauseOverlay.style.display = 'none'; // Ensure overlay is hidden
+            gameArea.style.pointerEvents = 'auto'; // Ensure clicks are re-enabled
+        }
+
+        // Function to start the game
+        async function startGame() {
+            await Tone.start();
+            console.log('Audio context started');
+
+            waterSaved = 0;
+            faucetsFixed = 0;
+            timeLeft = 60;
+            currentDifficultyLevel = 0;
+            currentFaucetGenerationRate = initialFaucetGenerationRate;
+            updateScore();
+            updateTimer();
+            gameRunning = true;
+            isPaused = false; // Ensure game starts unpaused
+            gameMessage.style.display = 'none'; // Hide the game message
+            startButton.style.display = 'none';
+            pauseButton.style.display = 'inline-block'; // Show pause button
+
+            gameInterval = setInterval(() => {
+                timeLeft--;
+                updateTimer();
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+
+            faucetInterval = setInterval(generateFaucet, currentFaucetGenerationRate);
+        }
+
+        // Event listener for clicks on the game area (background)
+        gameArea.addEventListener('click', (event) => {
+            if (gameRunning && event.target.id === 'gameArea' && !isPaused) { // Added isPaused check
+                waterSaved -= waterLossOnMissClick;
+                if (waterSaved < 0) waterSaved = 0;
+                updateScore();
+                missClickSound.triggerAttackRelease("C1", "16n", Tone.now());
+                console.log("Missed click! Water lost.");
+            }
+        });
+
+        // Event listeners for buttons
+        startButton.addEventListener('click', startGame);
+        gameMessageButton.addEventListener('click', startGame);
+        pauseButton.addEventListener('click', togglePause); // Add listener for pause button
+
+        // Initial setup on page load
+        window.onload = () => {
+            gameMessageTitle.textContent = "Welcome to the Water Conservation Challenge!";
+            gameMessageTip.textContent = waterTips[Math.floor(Math.random() * waterTips.length)]; // Display a random tip
+            finalFaucetsFixedSpan.parentElement.style.display = 'none'; // Hide score lines initially
+            finalWaterSavedSpan.parentElement.style.display = 'none'; // Hide score lines initially
+            gameMessageButton.textContent = 'Start Game';
+            gameMessage.style.display = 'flex'; // Ensure game message is visible
+            startButton.style.display = 'none'; // Hide the main start button, use the one in the message
+            pauseButton.style.display = 'none'; // Ensure pause button is hidden initially
+        };
+
+
+        // Add a simple resize observer for responsiveness (optional, but good practice)
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                activeFaucets.forEach(faucet => {
+                    const gameAreaWidth = gameArea.clientWidth - 60;
+                    const gameAreaHeight = gameArea.clientHeight - 60;
+                    let currentLeft = parseFloat(faucet.style.left);
+                    let currentTop = parseFloat(faucet.style.top);
+
+                    if (currentLeft > gameAreaWidth) {
+                        faucet.style.left = `${gameAreaWidth}px`;
+                    }
+                    if (currentTop > gameAreaHeight) {
+                        faucet.style.top = `${gameAreaHeight}px`;
+                    }
+                });
+            }
+        });
+        resizeObserver.observe(gameArea);
+
+    </script>
+</body>
+</html>
